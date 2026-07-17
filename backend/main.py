@@ -1,5 +1,7 @@
 from fastapi import FastAPI
-
+from pydantic import BaseModel
+import os
+from google import genai
 from models.learner import LearnerInput
 from models.roadmap import PlannerInput
 
@@ -31,6 +33,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from memory.learner_memory import learner_memory
 
 app = FastAPI(title="Agentic AI Learning System")
+
+class GhostToggleRequest(BaseModel):
+    enable: bool
+    learner_id: str = "vedant"
+
 
 # Add CORS middleware to allow requests from Flutter Web
 app.add_middleware(
@@ -108,5 +115,32 @@ def get_memory(learner_id: str):
         return {
             "message": "Session not found."
         }
+
+    return session
+
+
+@app.post("/api/ghost-mode/toggle")
+def toggle_ghost_mode(payload: GhostToggleRequest):
+    session = learner_memory.get_session(payload.learner_id)
+    if session is None:
+        return {"error": "Session not found"}
+
+    if payload.enable:
+        session["ghost_mode"] = True
+        session["backed_up_task"] = session["current_topic"]
+        
+        prompt = f"You are the Ghost Agent. The user is overwhelmed while trying to learn. Their current difficult milestone is: '{session['current_topic']}'. Generate a 2-minute alternative micro-task requiring zero coding or setup. Output ONLY a highly encouraging 2-sentence instruction. Never use guilt-inducing language."
+        
+        client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt,
+        )
+        
+        session["current_topic"] = response.text
+    else:
+        session["ghost_mode"] = False
+        session["current_topic"] = session["backed_up_task"]
+        session["backed_up_task"] = ""
 
     return session

@@ -30,7 +30,11 @@ class LearnerMemory:
 
             "average_score": 0,
 
-            "weak_topics": []
+            "weak_topics": [],
+
+            "ghost_mode": False,
+
+            "backed_up_task": ""
 
         }
 
